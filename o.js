@@ -1,38 +1,38 @@
+    // version 2
+
 (function () {
     'use strict';
 
-    // Базовый адрес прокси-мидлсена для обхода CORS и блокировок
-    var PROXY_SERVER = 'https://ts.lampac.sh';
+    // Рабочий сервер-парсер
+    var PARSER_URL = 'https://ts.lampac.sh';
 
-    function loadOriginalMod() {
-        // Загружаем оригинальный модуль online_mod
-        Lampa.Utils.putScript(['https://nb557.github.io/plugins/online_mod.js'], function () {
+    function initOnlineFix() {
+        // Подменяем настройки онлайн-источников в Lampa на рабочий Lampac
+        if (window.Lampa) {
+            Lampa.Storage.set('online_proxy', PARSER_URL);
+            Lampa.Storage.set('parser_use', 'true');
+            Lampa.Storage.set('parser_torrent_type', 'jackett');
             
-            // Перехватываем сетевой класс Lampa для автоматического проксирования запросов
-            if (Lampa.Reguest) {
-                var originalSilent = Lampa.Reguest.prototype.silent;
-                
-                Lampa.Reguest.prototype.silent = function (url, success, error, post_data, params) {
-                    // Если запрос идет к сторонним балансерам (rezka, collaps, vidsrc и т.д.), перенаправляем через мидлсен
-                    if (typeof url === 'string' && !url.includes(PROXY_SERVER) && (url.includes('rezka') || url.includes('stream') || url.includes('voidboost') || url.includes('kinopoisk'))) {
-                        url = PROXY_SERVER + '/relays?url=' + encodeURIComponent(url);
+            // Если включен модуль CUB, перенаправляем его запросы
+            Lampa.Listener.follow('app', function (e) {
+                if (e.type === 'ready') {
+                    if (Lampa.Settings && Lampa.Settings.main) {
+                        Lampa.Storage.set('source_use', 'cub');
                     }
-                    return originalSilent.call(this, url, success, error, post_data, params);
-                };
-            }
+                }
+            });
+        }
 
-            // Переопределяем настройки источников по умолчанию на JacRed / Lampac
-            if (window.lampa_settings) {
-                window.lampa_settings.online_proxy = PROXY_SERVER;
-            }
-            
-            console.log('Online Mod successfully patched with Middleman proxy!');
+        // Загружаем основной скрипт онлайн-мода
+        Lampa.Utils.putScript(['https://nb557.github.io/plugins/online_mod.js'], function () {
+            console.log('Online Mod successfully loaded');
         }, function () {
-            console.log('Error loading original online_mod.js');
+            // Резервная загрузка
+            Lampa.Utils.putScript(['https://lampac.sh/online.js']);
         });
     }
 
     if (window.Lampa) {
-        loadOriginalMod();
+        initOnlineFix();
     }
 })();
